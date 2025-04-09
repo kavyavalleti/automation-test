@@ -1,0 +1,98 @@
+import pytest
+from selenium import webdriver
+
+@pytest.fixture
+def driver():
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    driver = webdriver.Chrome(options=options)
+    driver.implicitly_wait(10)
+    yield driver
+    driver.quit()
+from selenium.webdriver.common.by import By
+
+class LoginPage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.username = (By.NAME, "username")
+        self.password = (By.NAME, "password")
+        self.login_button = (By.TAG_NAME, "button")
+
+    def login(self, uname, pwd):
+        self.driver.get("https://opensource-demo.orangehrmlive.com/web/index.php/auth/login")
+        self.driver.find_element(*self.username).send_keys(uname)
+        self.driver.find_element(*self.password).send_keys(pwd)
+        self.driver.find_element(*self.login_button).click()
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+
+class DashboardPage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.pim_menu = (By.LINK_TEXT, "PIM")
+        self.profile_dropdown = (By.CLASS_NAME, "oxd-userdropdown-tab")
+        self.logout_link = (By.LINK_TEXT, "Logout")
+
+    def go_to_pim(self):
+        ActionChains(self.driver).move_to_element(self.driver.find_element(*self.pim_menu)).click().perform()
+
+    def logout(self):
+        self.driver.find_element(*self.profile_dropdown).click()
+        self.driver.find_element(*self.logout_link).click()
+from selenium.webdriver.common.by import By
+
+class PimPage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.add_button = (By.LINK_TEXT, "Add Employee")
+        self.first_name = (By.NAME, "firstName")
+        self.last_name = (By.NAME, "lastName")
+        self.save_button = (By.XPATH, "//button[@type='submit']")
+        self.employee_list_tab = (By.LINK_TEXT, "Employee List")
+        self.employee_names = (By.XPATH, "//div[@class='oxd-table-card']//div[3]")
+
+    def add_employee(self, fname, lname):
+        self.driver.find_element(*self.add_button).click()
+        self.driver.find_element(*self.first_name).send_keys(fname)
+        self.driver.find_element(*self.last_name).send_keys(lname)
+        self.driver.find_element(*self.save_button).click()
+
+    def go_to_employee_list(self):
+        self.driver.find_element(*self.employee_list_tab).click()
+
+    def verify_employee(self, full_name):
+        names = self.driver.find_elements(*self.employee_names)
+        for name in names:
+            if name.text.strip() == full_name:
+                print(f"{full_name} - Name Verified")
+                return True
+        return False
+from pages.login_page import LoginPage
+from pages.dashboard_page import DashboardPage
+from pages.pim_page import PimPage
+import time
+
+def test_orangehrm_workflow(driver):
+    login = LoginPage(driver)
+    dashboard = DashboardPage(driver)
+    pim = PimPage(driver)
+
+   
+    login.login("Admin", "admin123")
+
+    
+    dashboard.go_to_pim()
+
+ 
+    employees = [("John", "Doe"), ("Jane", "Smith"), ("Alice", "Johnson"), ("Bob", "Brown")]
+    for fname, lname in employees:
+        pim.add_employee(fname, lname)
+        time.sleep(1) 
+    
+    pim.go_to_employee_list()
+    time.sleep(2)  
+    for fname, lname in employees:
+        assert pim.verify_employee(f"{fname} {lname}")
+
+    
+    dashboard.logout()
